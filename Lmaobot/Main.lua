@@ -3,10 +3,10 @@
 ---@alias NavNode { id: integer, x: number, y: number, z: number, c: { [1]: NavConnection, [2]: NavConnection, [3]: NavConnection, [4]: NavConnection } }
 
 --[[ Imports ]]
-local sourceNav = require("Lmaobot/SourceNav")
+local sourceNav = require("Lmaobot.SourceNav")
 
 ---@type AStar
-local aStar = require("Lmaobot/A-Star")
+local aStar = require("Lmaobot.A-Star")
 
 ---@type boolean, LNXlib
 local libLoaded, Lib = pcall(require, "LNXlib")
@@ -99,7 +99,7 @@ local function FindPath(start, goal)
         return
     end
 
-    local path = aStar.path(startNode, goalNode, navNodes, IsValidConnection)
+    local path = aStar.Path(startNode, goalNode, navNodes)
     if not path then
         Log:Error("Failed to find path from %d to %d!", start, goal)
         return
