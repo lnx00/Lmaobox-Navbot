@@ -22,18 +22,18 @@ end
 ---@return PathNode[]
 local function GetAdjacentNodes(node, nodes)
 	local adjacentNodes = {}
-	
+
 	for dir = 1, 4 do
-        local conDir = node.c[dir]
-        if conDir then
-            for _, con in pairs(conDir.connections) do
+		local conDir = node.c[dir]
+		if conDir then
+			for _, con in pairs(conDir.connections) do
 				local conNode = nodes[con]
 				if conNode then
 					table.insert(adjacentNodes, conNode)
 				end
-            end
-        end
-    end
+			end
+		end
+	end
 
 	return adjacentNodes
 end

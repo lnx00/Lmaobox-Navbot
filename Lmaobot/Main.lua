@@ -172,10 +172,12 @@ end
 callbacks.Unregister("Draw", "LNX.Lmaobot.Draw")
 callbacks.Register("Draw", "LNX.Lmaobot.Draw", OnDraw)
 
+-- Reloads the nav file
 Commands.Register("pf_reload", function()
     LoadNavFile()
 end)
 
+-- Calculates the path from start to goal
 Commands.Register("pf", function(args)
     if args:size() ~= 2 then
         print("Usage: pf <Start> <Goal>")
@@ -191,6 +193,51 @@ Commands.Register("pf", function(args)
     end
 
     FindPath(start, goal)
+end)
+
+-- Runs a benchmark
+Commands.Register("pf_bench", function (args)
+    if args:size() ~= 3 then
+        print("Usage: pf <Start> <Goal> <Iterations>")
+        return
+    end
+
+    local start = tonumber(args:popFront())
+    local goal = tonumber(args:popFront())
+    local iterations = tonumber(args:popFront())
+
+    if not start or not goal or not iterations then
+        print("Start/Goal/Iterations must be numbers!")
+        return
+    end
+
+    local startNode = navNodes[start]
+    if not startNode then
+        Log:Error("Start node %d not found!", start)
+        return
+    end
+
+    local goalNode = navNodes[goal]
+    if not goalNode then
+        Log:Error("Goal node %d not found!", goal)
+        return
+    end
+
+    local startTime = os.clock()
+    for i = 1, iterations do
+        local path = aStar.Path(startNode, goalNode, navNodes)
+        if not path then
+            Log:Error("Failed to find path from %d to %d!", start, goal)
+            return
+        end
+    end
+    local endTime = os.clock()
+    local elapsedTime = endTime - startTime
+
+    print(string.format("Took %.2f s to find %d paths", elapsedTime, iterations))
+
+    currentPath = nil
+    collectgarbage()
 end)
 
 LoadNavFile()
