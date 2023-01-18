@@ -53,10 +53,11 @@ end
 ---@return PathNode[]|nil
 function AStar.Path(start, goal, nodes)
 	local openSet, closedSet = Heap.new(), {}
-	openSet.Compare = function(a, b) return a.fScore < b.fScore end
+	local gScore, fScore = {}, {}
+	gScore[start.id] = 0
+	fScore[start.id] = gScore[start.id] + HeuristicCostEstimate(start, goal)
 
-	start.gScore = 0
-	start.fScore = start.gScore + HeuristicCostEstimate(start, goal)
+	openSet.Compare = function(a, b) return fScore[a.id] < fScore[b.id] end
 	openSet:Push(start)
 
 	while not openSet:Empty() do
@@ -75,11 +76,12 @@ function AStar.Path(start, goal, nodes)
 			for _, neighbor in ipairs(adjacentNodes) do
 				local neighborID = neighbor.id
 				if not closedSet[neighborID] then
-					local tentativeGScore = current.gScore + HeuristicCostEstimate(current, neighbor)
+					local tentativeGScore = gScore[current.id] + HeuristicCostEstimate(current, neighbor)
 
-					if not neighbor.gScore or tentativeGScore < neighbor.gScore then
-						neighbor.gScore = tentativeGScore
-						neighbor.fScore = neighbor.gScore + HeuristicCostEstimate(neighbor, goal)
+					local neighborGScore = gScore[neighborID]
+					if not neighborGScore or tentativeGScore < neighborGScore then
+						gScore[neighborID] = tentativeGScore
+						fScore[neighborID] = gScore[neighborID] + HeuristicCostEstimate(neighbor, goal)
 						neighbor.previous = current
 						openSet:Push(neighbor)
 					end
