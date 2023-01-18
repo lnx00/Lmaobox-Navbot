@@ -164,6 +164,8 @@ function AStar.path(start, goal, nodes, validNodeFunc)
 				end
 			end
 		end
+
+		coroutine.yield(current)
 	end
 
 	-- No valid path
