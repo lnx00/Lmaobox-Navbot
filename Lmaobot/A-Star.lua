@@ -14,10 +14,10 @@ local function HeuristicCostEstimate(nodeA, nodeB)
 	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2 + (nodeB.z - nodeA.z) ^ 2)
 end
 
-local function ReconstructPath(current)
+local function ReconstructPath(current, previous)
 	local path = { current }
-	while current.previous do
-		current = current.previous
+	while previous[current] do
+		current = previous[current]
 		table.insert(path, current)
 	end
 
@@ -38,6 +38,7 @@ function AStar.Path(start, goal, nodes, adjacentFun)
 	openSet.Compare = function(a, b) return fScore[a] < fScore[b] end
 	openSet:push(start)
 
+	local previous = {}
 	while not openSet:empty() do
 		---@type PathNode
 		local current = openSet:pop()
@@ -47,7 +48,7 @@ function AStar.Path(start, goal, nodes, adjacentFun)
 			-- Found the goal
 			if current.id == goal.id then
 				openSet:clear()
-				return ReconstructPath(current)
+				return ReconstructPath(current, previous)
 			end
 
 			closedSet[current] = true
@@ -63,7 +64,7 @@ function AStar.Path(start, goal, nodes, adjacentFun)
 					if not neighborGScore or tentativeGScore < neighborGScore then
 						gScore[neighbor] = tentativeGScore
 						fScore[neighbor] = tentativeGScore + HeuristicCostEstimate(neighbor, goal)
-						neighbor.previous = current
+						previous[neighbor] = current
 						openSet:push(neighbor)
 					end
 				end

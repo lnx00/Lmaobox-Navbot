@@ -1,7 +1,12 @@
-local aStar = require("Lmaobot.A-Star")
-
 ---@alias Connection { count: integer, connections: integer[] }
 ---@alias Node { x: number, y: number, z: number, id: integer, c: { [1]: Connection, [2]: Connection, [3]: Connection, [4]: Connection } }
+
+local Common = require("Lmaobot.Common")
+local SourceNav = require("Lmaobot.SourceNav")
+local AStar = require("Lmaobot.A-Star")
+local Lib, Log = Common.Lib, Common.Log
+
+local FS = Lib.Utils.FileSystem
 
 local function DistTo(a, b)
     return math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2 + (a.z - b.z) ^ 2)
@@ -32,10 +37,37 @@ function Navigation.GetCurrentPath()
     return CurrentPath
 end
 
+function Navigation.ClearPath()
+    CurrentPath = nil
+end
+
 ---@param id integer
 ---@return Node
 function Navigation.GetNodeByID(id)
     return Nodes[id]
+end
+
+---@param navFile string
+function Navigation.LoadFile(navFile)
+    -- Read nav file
+    local rawNavData = FS.Read("tf/" .. navFile)
+    assert(rawNavData, "Failed to read nav file: " .. navFile)
+
+    -- Parse nav file
+    local navData = SourceNav.parse(rawNavData)
+    Log:Info("Parsed %d areas", #navData.areas)
+
+    -- Convert nav data to usable format
+    local navNodes = {}
+    for _, area in ipairs(navData.areas) do
+        local cX = (area.north_west.x + area.south_east.x) // 2
+        local cY = (area.north_west.y + area.south_east.y) // 2
+        local cZ = (area.north_west.z + area.south_east.z) // 2
+
+        navNodes[area.id] = { x = cX, y = cY, z = cZ, id = area.id, c = area.connections }
+    end
+
+    Navigation.SetNodes(navNodes)
 end
 
 ---@param pos Vector3|{ x:number, y:number, z:number }
@@ -76,18 +108,18 @@ end
 ---@param goalNode Node
 function Navigation.FindPath(startNode, goalNode)
     if not startNode then
-        warn(string.format("Invalid start node %d!", startNode.id))
+        Log:Warn("Invalid start node %d!", startNode.id)
         return
     end
 
     if not goalNode then
-        warn(string.format("Invalid goal node %d!", goalNode.id))
+        Log:Warn("Invalid goal node %d!", goalNode.id)
         return
     end
 
-    CurrentPath = aStar.Path(startNode, goalNode, Nodes, GetAdjacentNodes)
+    CurrentPath = AStar.Path(startNode, goalNode, Nodes, GetAdjacentNodes)
     if not CurrentPath then
-        error(string.format("Failed to find path from %d to %d!", startNode.id, goalNode.id))
+        Log:Error("Failed to find path from %d to %d!", startNode.id, goalNode.id)
     end
 end
 
