@@ -1,10 +1,11 @@
+local sourceNav = require("Lmaobot.SourceNav")
+
 --[[ Annotations ]]
 ---@alias NavConnection { count: integer, connections: integer[] }
 ---@alias NavNode { id: integer, x: number, y: number, z: number, c: { [1]: NavConnection, [2]: NavConnection, [3]: NavConnection, [4]: NavConnection } }
 
 --[[ Imports ]]
-local sourceNav = require("Lmaobot.SourceNav")
-local aStar = require("Lmaobot.A-Star")
+local nav = require("Lmaobot.Navigation")
 local bench = require("Lmaobot.Benchmark")
 
 ---@type boolean, LNXlib
@@ -15,7 +16,7 @@ assert(Lib.GetVersion() >= 0.94, "LNXlib version is too old, please update it!")
 -- Unload package for debugging
 Lib.Utils.UnloadPackages("Lmaobot")
 
-local Notify, FS, Fonts, Commands, Timer = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands, Lib.Utils.Timer
+local Notify, FS, Fonts, Commands = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands
 local Log = Lib.Utils.Logger.new("Lmaobot")
 Log.Level = 0
 
@@ -26,14 +27,6 @@ local options = {
     drawNodes = false,
     drawPath = true,
 }
-
----@type NavNode[]
-local navNodes = {}
-
----@type NavNode[]|nil
-local currentPath = nil
-
-local updateTimer = Timer.new()
 
 --[[ Functions ]]
 
@@ -51,80 +44,20 @@ local function LoadNavFile()
     Log:Info("Parsed %d areas", #navData.areas)
 
     -- Convert nav data to usable format
-    navNodes = {}
+    local navNodes = {}
     for _, area in ipairs(navData.areas) do
-        local cX = (area.north_west.x + area.south_east.x) / 2
-        local cY = (area.north_west.y + area.south_east.y) / 2
-        local cZ = (area.north_west.z + area.south_east.z) / 2
+        local cX = (area.north_west.x + area.south_east.x) // 2
+        local cY = (area.north_west.y + area.south_east.y) // 2
+        local cZ = (area.north_west.z + area.south_east.z) // 2
 
         navNodes[area.id] = { x = cX, y = cY, z = cZ, id = area.id, c = area.connections }
     end
 
+    nav.SetNodes(navNodes)
+
     -- Free memory
     rawNavData, navData = nil, nil
     collectgarbage()
-end
-
-local function GetClosestNode(pos)
-    local closestNode = nil
-    local closestDist = math.huge
-
-    for _, node in pairs(navNodes) do
-        local dist = math.sqrt((node.x - pos.x) ^ 2 + (node.y - pos.y) ^ 2 + (node.z - pos.z) ^ 2)
-        if dist < closestDist then
-            closestNode = node
-            closestDist = dist
-        end
-    end
-
-    return closestNode
-end
-
---[[ Pathfinding ]]
-
--- Returns the heuristic cost estimate of the given nodes
-local function HeuristicCostEstimate(nodeA, nodeB)
-	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2 + (nodeB.z - nodeA.z) ^ 2)
-end
-
--- Returns all adjacent nodes of the given node
-local function GetAdjacentNodes(node, nodes)
-	local adjacentNodes = {}
-
-	for dir = 1, 4 do
-		local conDir = node.c[dir]
-        for _, con in pairs(conDir.connections) do
-            local conNode = nodes[con]
-            if conNode then
-                table.insert(adjacentNodes, conNode)
-            end
-        end
-	end
-
-	return adjacentNodes
-end
-
--- Updates the current path to the given goal
-local function FindPath(start, goal)
-    local startNode = navNodes[start]
-    if not startNode then
-        Log:Error("Start node %d not found!", start)
-        return
-    end
-
-    local goalNode = navNodes[goal]
-    if not goalNode then
-        Log:Error("Goal node %d not found!", goal)
-        return
-    end
-
-    local path = aStar.Path(startNode, goalNode, navNodes, GetAdjacentNodes, HeuristicCostEstimate)
-    if not path then
-        Log:Error("Failed to find path from %d to %d!", start, goal)
-        return
-    end
-
-    currentPath = path
 end
 
 --[[ Callbacks ]]
@@ -157,6 +90,7 @@ local function OnDraw()
     if options.drawNodes then
         draw.Color(0, 255, 0, 255)
 
+        local navNodes = nav.GetNodes()
         for id, node in pairs(navNodes) do
             local nodePos = Vector3(node.x, node.y, node.z)
             local dist = (myPos - nodePos):Length()
@@ -173,9 +107,10 @@ local function OnDraw()
     end
 
     -- Draw current path
-    if options.drawPath and currentPath then
+    if options.drawPath then
         draw.Color(255, 255, 0, 255)
 
+        local currentPath = nav.CurrentPath
         local pathSize = #currentPath
         for i, node in ipairs(currentPath) do
             local nodePos = Vector3(node.x, node.y, node.z)
@@ -184,7 +119,7 @@ local function OnDraw()
             local screenPos = client.WorldToScreen(nodePos)
             if not screenPos then goto continue end
 
-            draw.Text(screenPos[1], screenPos[2], tostring(node.id))
+            --draw.Text(screenPos[1], screenPos[2], tostring(node.id))
             if i < pathSize then
                 local nextNode = currentPath[i + 1]
                 local nextNodePos = Vector3(nextNode.x, nextNode.y, nextNode.z)
@@ -245,7 +180,7 @@ Commands.Register("pf", function(args)
         return
     end
 
-    FindPath(start, goal)
+    nav.FindPath(start, goal)
 end)
 
 -- Runs a benchmark
@@ -265,11 +200,10 @@ Commands.Register("pf_bench", function (args)
     end
 
     local time = bench.Run(n, function()
-        FindPath(start, goal)
+        nav.FindPath(start, goal)
     end)
     Log:Debug("Pathfinding took %.2f s for %d iterations", time, n)
 
-    currentPath = nil
     collectgarbage()
 end)
 

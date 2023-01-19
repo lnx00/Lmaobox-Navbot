@@ -11,7 +11,7 @@ local Heap = require("Lmaobot.Heap")
 local AStar = {}
 
 local function HeuristicCostEstimate(nodeA, nodeB)
-	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2)
+	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2 + (nodeB.z - nodeA.z) ^ 2)
 end
 
 local function ReconstructPath(current)
@@ -28,15 +28,12 @@ end
 ---@param goal PathNode
 ---@param nodes PathNode[]
 ---@param adjacentFun fun(node : PathNode, nodes : PathNode[]) : PathNode[]
----@param hCostFun? fun(nodeA : PathNode, nodeB : PathNode) : number
 ---@return PathNode[]|nil
-function AStar.Path(start, goal, nodes, adjacentFun, hCostFun)
-	hCostFun = hCostFun or HeuristicCostEstimate
-
+function AStar.Path(start, goal, nodes, adjacentFun)
 	local openSet, closedSet = Heap.new(), {}
 	local gScore, fScore = {}, {}
 	gScore[start] = 0
-	fScore[start] = hCostFun(start, goal)
+	fScore[start] = HeuristicCostEstimate(start, goal)
 
 	openSet.Compare = function(a, b) return fScore[a] < fScore[b] end
 	openSet:push(start)
@@ -60,12 +57,12 @@ function AStar.Path(start, goal, nodes, adjacentFun, hCostFun)
 			for i = 1, #adjacentNodes do
 				local neighbor = adjacentNodes[i]
 				if not closedSet[neighbor] then
-					local tentativeGScore = gScore[current] + hCostFun(current, neighbor)
+					local tentativeGScore = gScore[current] + HeuristicCostEstimate(current, neighbor)
 
 					local neighborGScore = gScore[neighbor]
 					if not neighborGScore or tentativeGScore < neighborGScore then
 						gScore[neighbor] = tentativeGScore
-						fScore[neighbor] = tentativeGScore + hCostFun(neighbor, goal)
+						fScore[neighbor] = tentativeGScore + HeuristicCostEstimate(neighbor, goal)
 						neighbor.previous = current
 						openSet:push(neighbor)
 					end
