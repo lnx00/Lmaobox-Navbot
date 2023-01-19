@@ -83,6 +83,30 @@ local function IsValidConnection(node, neighbor)
     return false
 end
 
+-- Returns the heuristic cost estimate of the given nodes
+local function HeuristicCostEstimate(nodeA, nodeB)
+	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2)
+end
+
+-- Returns all adjacent nodes of the given node
+local function GetAdjacentNodes(node, nodes)
+	local adjacentNodes = {}
+
+	for dir = 1, 4 do
+		local conDir = node.c[dir]
+		if conDir then
+			for _, con in pairs(conDir.connections) do
+				local conNode = nodes[con]
+				if conNode then
+					table.insert(adjacentNodes, conNode)
+				end
+			end
+		end
+	end
+
+	return adjacentNodes
+end
+
 -- Updates the current path to the given goal
 local function FindPath(start, goal)
     local startNode = navNodes[start]
@@ -97,7 +121,7 @@ local function FindPath(start, goal)
         return
     end
 
-    local path = aStar.Path(startNode, goalNode, navNodes)
+    local path = aStar.Path(startNode, goalNode, navNodes, GetAdjacentNodes, HeuristicCostEstimate)
     if not path then
         Log:Error("Failed to find path from %d to %d!", start, goal)
         return

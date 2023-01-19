@@ -14,26 +14,6 @@ local function HeuristicCostEstimate(nodeA, nodeB)
 	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2)
 end
 
--- TODO: Don't do this here
----@return PathNode[]
-local function GetAdjacentNodes(node, nodes)
-	local adjacentNodes = {}
-
-	for dir = 1, 4 do
-		local conDir = node.c[dir]
-		if conDir then
-			for _, con in pairs(conDir.connections) do
-				local conNode = nodes[con]
-				if conNode then
-					table.insert(adjacentNodes, conNode)
-				end
-			end
-		end
-	end
-
-	return adjacentNodes
-end
-
 local function ReconstructPath(current)
 	local path = { current }
 	while current.previous do
@@ -46,38 +26,46 @@ end
 
 ---@param start PathNode
 ---@param goal PathNode
+---@param nodes PathNode[]
+---@param adjacentFun fun(node : PathNode, nodes : PathNode[]) : PathNode[]
+---@param hCostFun? fun(nodeA : PathNode, nodeB : PathNode) : number
 ---@return PathNode[]|nil
-function AStar.Path(start, goal, nodes)
+function AStar.Path(start, goal, nodes, adjacentFun, hCostFun)
+	hCostFun = hCostFun or HeuristicCostEstimate
+
 	local openSet, closedSet = Heap.new(), {}
 	local gScore, fScore = {}, {}
-	gScore[start.id] = 0
-	fScore[start.id] = gScore[start.id] + HeuristicCostEstimate(start, goal)
+	gScore[start] = 0
+	fScore[start] = hCostFun(start, goal)
 
-	openSet.Compare = function(a, b) return fScore[a.id] < fScore[b.id] end
+	openSet.Compare = function(a, b) return fScore[a] < fScore[b] end
 	openSet:push(start)
 
 	while not openSet:empty() do
 		---@type PathNode
 		local current = openSet:pop()
-		local currentID = current.id
 
-		if not closedSet[currentID] then
-			if currentID == goal.id then
+		if not closedSet[current] then
+
+			-- Found the goal
+			if current.id == goal.id then
+				openSet:clear()
 				return ReconstructPath(current)
 			end
 
-			closedSet[currentID] = true
+			closedSet[current] = true
 
-			local adjacentNodes = GetAdjacentNodes(current, nodes)
-			for _, neighbor in ipairs(adjacentNodes) do
-				local neighborID = neighbor.id
-				if not closedSet[neighborID] then
-					local tentativeGScore = gScore[current.id] + HeuristicCostEstimate(current, neighbor)
+			-- Traverse adjacent nodes
+			local adjacentNodes = adjacentFun(current, nodes)
+			for i = 1, #adjacentNodes do
+				local neighbor = adjacentNodes[i]
+				if not closedSet[neighbor] then
+					local tentativeGScore = gScore[current] + hCostFun(current, neighbor)
 
-					local neighborGScore = gScore[neighborID]
+					local neighborGScore = gScore[neighbor]
 					if not neighborGScore or tentativeGScore < neighborGScore then
-						gScore[neighborID] = tentativeGScore
-						fScore[neighborID] = gScore[neighborID] + HeuristicCostEstimate(neighbor, goal)
+						gScore[neighbor] = tentativeGScore
+						fScore[neighbor] = tentativeGScore + hCostFun(neighbor, goal)
 						neighbor.previous = current
 						openSet:push(neighbor)
 					end
