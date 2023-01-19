@@ -70,21 +70,13 @@ local function OnDraw()
     if not me then return end
 
     local myPos = me:GetAbsOrigin()
+    local currentPath = nav.GetCurrentPath()
 
     -- Memory usage
     if options.memoryUsage then
         local memUsage = collectgarbage("count")
         draw.Text(20, 120, string.format("Memory usage: %.2f MB", memUsage / 1024))
     end
-
-    -- Update current node
-    --[[if navNodes and updateTimer:Run(1) then
-        local closestNode = GetClosestNode(myPos.x, myPos.y, myPos.z)
-        if closestNode then
-            print("Found node: " .. closestNode.id)
-            --FindPath(closestNode.id, 502)
-        end
-    end]]
 
     -- Draw all nodes
     if options.drawNodes then
@@ -107,27 +99,21 @@ local function OnDraw()
     end
 
     -- Draw current path
-    if options.drawPath then
+    if options.drawPath and currentPath then
         draw.Color(255, 255, 0, 255)
 
-        local currentPath = nav.CurrentPath
-        local pathSize = #currentPath
-        for i, node in ipairs(currentPath) do
-            local nodePos = Vector3(node.x, node.y, node.z)
-            if (myPos - nodePos):Length() > 1200 then goto continue end
+        for i = 1, #currentPath - 1 do
+            local node1 = currentPath[i]
+            local node2 = currentPath[i + 1]
 
-            local screenPos = client.WorldToScreen(nodePos)
-            if not screenPos then goto continue end
+            local node1Pos = Vector3(node1.x, node1.y, node1.z)
+            local node2Pos = Vector3(node2.x, node2.y, node2.z)
 
-            --draw.Text(screenPos[1], screenPos[2], tostring(node.id))
-            if i < pathSize then
-                local nextNode = currentPath[i + 1]
-                local nextNodePos = Vector3(nextNode.x, nextNode.y, nextNode.z)
-                local nextScreenPos = client.WorldToScreen(nextNodePos)
-                if nextScreenPos then
-                    draw.Line(screenPos[1], screenPos[2], nextScreenPos[1], nextScreenPos[2])
-                end
-            end
+            local screenPos1 = client.WorldToScreen(node1Pos)
+            local screenPos2 = client.WorldToScreen(node2Pos)
+            if not screenPos1 or not screenPos2 then goto continue end
+
+            draw.Line(screenPos1[1], screenPos1[2], screenPos2[1], screenPos2[2])
 
             ::continue::
         end
@@ -180,31 +166,15 @@ Commands.Register("pf", function(args)
         return
     end
 
-    nav.FindPath(start, goal)
-end)
+    local startNode = nav.GetNodeByID(start)
+    local goalNode = nav.GetNodeByID(goal)
 
--- Runs a benchmark
-Commands.Register("pf_bench", function (args)
-    if args:size() ~= 3 then
-        print("Usage: pf <Start> <Goal> <Iterations>")
+    if not startNode or not goalNode then
+        print("Start/Goal node not found!")
         return
     end
 
-    local start = tonumber(args:popFront())
-    local goal = tonumber(args:popFront())
-    local n = tonumber(args:popFront())
-
-    if not start or not goal or not n then
-        print("Start/Goal/Iterations must be numbers!")
-        return
-    end
-
-    local time = bench.Run(n, function()
-        nav.FindPath(start, goal)
-    end)
-    Log:Debug("Pathfinding took %.2f s for %d iterations", time, n)
-
-    collectgarbage()
+    nav.FindPath(startNode, goalNode)
 end)
 
 Notify.Alert("Lmaobot loaded!")

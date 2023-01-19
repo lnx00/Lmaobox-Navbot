@@ -8,12 +8,13 @@ local function DistTo(a, b)
 end
 
 ---@class Pathfinding
----@field public CurrentPath Node[]
-local Navigation = {
-    CurrentPath = {}
-}
+local Navigation = {}
 
+---@type Node[]
 local Nodes = {}
+
+---@type Node[]|nil
+local CurrentPath = nil
 
 ---@param nodes Node[]
 function Navigation.SetNodes(nodes)
@@ -25,7 +26,19 @@ function Navigation.GetNodes()
     return Nodes
 end
 
----@param pos Vector3 | { x:number, y:number, z:number }
+---@return Node[]|nil
+---@return Node[]|nil
+function Navigation.GetCurrentPath()
+    return CurrentPath
+end
+
+---@param id integer
+---@return Node
+function Navigation.GetNodeByID(id)
+    return Nodes[id]
+end
+
+---@param pos Vector3|{ x:number, y:number, z:number }
 ---@return Node
 function Navigation.GetClosestNode(pos)
     local closestNode = nil
@@ -59,28 +72,23 @@ local function GetAdjacentNodes(node, nodes)
 	return adjacentNodes
 end
 
----@param startID integer
----@param goalID integer
-function Navigation.FindPath(startID, goalID)
-    local startNode = Nodes[startID]
+---@param startNode Node
+---@param goalNode Node
+function Navigation.FindPath(startNode, goalNode)
     if not startNode then
-        warn(string.format("Start node %d not found!", startID))
+        warn(string.format("Invalid start node %d!", startNode.id))
         return
     end
 
-    local goalNode = Nodes[goalID]
     if not goalNode then
-        warn(string.format("Goal node %d not found!", goalID))
+        warn(string.format("Invalid goal node %d!", goalNode.id))
         return
     end
 
-    local path = aStar.Path(startNode, goalNode, Nodes, GetAdjacentNodes)
-    if not path then
-        error(string.format("Failed to find path from %d to %d!", startID, goalID))
-        return
+    CurrentPath = aStar.Path(startNode, goalNode, Nodes, GetAdjacentNodes)
+    if not CurrentPath then
+        error(string.format("Failed to find path from %d to %d!", startNode.id, goalNode.id))
     end
-
-    Navigation.CurrentPath = path
 end
 
 return Navigation
