@@ -15,7 +15,7 @@ assert(Lib.GetVersion() >= 0.94, "LNXlib version is too old, please update it!")
 -- Unload package for debugging
 Lib.Utils.UnloadPackages("Lmaobot")
 
-local Notify, FS, Fonts, Commands = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands
+local Notify, FS, Fonts, Commands, Timer = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands, Lib.Utils.Timer
 local Log = Lib.Utils.Logger.new("Lmaobot")
 Log.Level = 0
 
@@ -33,6 +33,8 @@ local navNodes = {}
 ---@type NavNode[]|nil
 local currentPath = nil
 
+local updateTimer = Timer.new()
+
 --[[ Functions ]]
 
 -- Loads the nav file of the current map
@@ -42,7 +44,7 @@ local function LoadNavFile()
 
     -- Read nav file
     local rawNavData = FS.Read("tf/" .. navFile)
-    assert(rawNavData, "Failed to read nav file!")
+    assert(rawNavData, "Failed to read nav file: " .. navFile)
 
     -- Parse nav file
     local navData = sourceNav.parse(rawNavData)
@@ -63,29 +65,26 @@ local function LoadNavFile()
     collectgarbage()
 end
 
----@param node NavNode
----@param neighbor NavNode
----@return boolean
-local function IsValidConnection(node, neighbor)
-    for dir = 1, 4 do
-        local conDir = node.c[dir]
-        if conDir then
-            for _, con in pairs(conDir.connections) do
-                if con == neighbor.id then
-                    --if node.z + 70 > neighbor.z then
-                        return true
-                    --end
-                end
-            end
+local function GetClosestNode(pos)
+    local closestNode = nil
+    local closestDist = math.huge
+
+    for _, node in pairs(navNodes) do
+        local dist = math.sqrt((node.x - pos.x) ^ 2 + (node.y - pos.y) ^ 2 + (node.z - pos.z) ^ 2)
+        if dist < closestDist then
+            closestNode = node
+            closestDist = dist
         end
     end
 
-    return false
+    return closestNode
 end
+
+--[[ Pathfinding ]]
 
 -- Returns the heuristic cost estimate of the given nodes
 local function HeuristicCostEstimate(nodeA, nodeB)
-	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2)
+	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2 + (nodeB.z - nodeA.z) ^ 2)
 end
 
 -- Returns all adjacent nodes of the given node
@@ -94,14 +93,12 @@ local function GetAdjacentNodes(node, nodes)
 
 	for dir = 1, 4 do
 		local conDir = node.c[dir]
-		if conDir then
-			for _, con in pairs(conDir.connections) do
-				local conNode = nodes[con]
-				if conNode then
-					table.insert(adjacentNodes, conNode)
-				end
-			end
-		end
+        for _, con in pairs(conDir.connections) do
+            local conNode = nodes[con]
+            if conNode then
+                table.insert(adjacentNodes, conNode)
+            end
+        end
 	end
 
 	return adjacentNodes
@@ -146,6 +143,15 @@ local function OnDraw()
         local memUsage = collectgarbage("count")
         draw.Text(20, 120, string.format("Memory usage: %.2f MB", memUsage / 1024))
     end
+
+    -- Update current node
+    --[[if navNodes and updateTimer:Run(1) then
+        local closestNode = GetClosestNode(myPos.x, myPos.y, myPos.z)
+        if closestNode then
+            print("Found node: " .. closestNode.id)
+            --FindPath(closestNode.id, 502)
+        end
+    end]]
 
     -- Draw all nodes
     if options.drawNodes then
@@ -193,6 +199,11 @@ local function OnDraw()
     end
 end
 
+---@param userCmd UserCmd
+local function OnCreateMove(userCmd)
+
+end
+
 ---@param event GameEvent
 local function OnGameEvent(event)
     local eventName = event:GetName()
@@ -205,9 +216,11 @@ local function OnGameEvent(event)
 end
 
 callbacks.Unregister("Draw", "LNX.Lmaobot.Draw")
+callbacks.Unregister("CreateMove", "LNX.Lmaobot.CreateMove")
 callbacks.Unregister("FireGameEvent", "LNX.Lmaobot.FireGameEvent")
 
 callbacks.Register("Draw", "LNX.Lmaobot.Draw", OnDraw)
+callbacks.Register("CreateMove", "LNX.Lmaobot.CreateMove", OnCreateMove)
 callbacks.Register("FireGameEvent", "LNX.Lmaobot.FireGameEvent", OnGameEvent)
 
 --[[ Commands ]]
