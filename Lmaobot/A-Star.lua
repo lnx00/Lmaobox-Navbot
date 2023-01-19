@@ -10,12 +10,8 @@ local Heap = require("Lmaobot.Heap")
 ---@class AStar
 local AStar = {}
 
-local function Distance(x1, y1, x2, y2)
-	return math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
-end
-
 local function HeuristicCostEstimate(nodeA, nodeB)
-	return Distance(nodeA.x, nodeA.y, nodeB.x, nodeB.y)
+	return math.sqrt((nodeB.x - nodeA.x) ^ 2 + (nodeB.y - nodeA.y) ^ 2)
 end
 
 -- TODO: Don't do this here
@@ -58,11 +54,11 @@ function AStar.Path(start, goal, nodes)
 	fScore[start.id] = gScore[start.id] + HeuristicCostEstimate(start, goal)
 
 	openSet.Compare = function(a, b) return fScore[a.id] < fScore[b.id] end
-	openSet:Push(start)
+	openSet:push(start)
 
-	while not openSet:Empty() do
+	while not openSet:empty() do
 		---@type PathNode
-		local current = openSet:Pop()
+		local current = openSet:pop()
 		local currentID = current.id
 
 		if not closedSet[currentID] then
@@ -83,7 +79,7 @@ function AStar.Path(start, goal, nodes)
 						gScore[neighborID] = tentativeGScore
 						fScore[neighborID] = gScore[neighborID] + HeuristicCostEstimate(neighbor, goal)
 						neighbor.previous = current
-						openSet:Push(neighbor)
+						openSet:push(neighbor)
 					end
 				end
 			end
