@@ -4,9 +4,8 @@
 
 --[[ Imports ]]
 local sourceNav = require("Lmaobot.SourceNav")
-
----@type AStar
 local aStar = require("Lmaobot.A-Star")
+local bench = require("Lmaobot.Benchmark")
 
 ---@type boolean, LNXlib
 local libLoaded, Lib = pcall(require, "LNXlib")
@@ -18,8 +17,7 @@ Lib.Utils.UnloadPackages("Lmaobot")
 
 local Notify, FS, Fonts, Commands = Lib.UI.Notify, Lib.Utils.FileSystem, Lib.UI.Fonts, Lib.Utils.Commands
 local Log = Lib.Utils.Logger.new("Lmaobot")
-
-Notify.Alert("Lmaobot loaded!")
+Log.Level = 0
 
 --[[ Variables ]]
 
@@ -108,6 +106,8 @@ local function FindPath(start, goal)
     currentPath = path
 end
 
+--[[ Callbacks ]]
+
 local function OnDraw()
     draw.SetFont(Fonts.Verdana)
     draw.Color(255, 0, 0, 255)
@@ -169,8 +169,24 @@ local function OnDraw()
     end
 end
 
+---@param event GameEvent
+local function OnGameEvent(event)
+    local eventName = event:GetName()
+
+    -- Reload nav file on new map
+    if eventName == "game_newmap" then
+        Log:Info("New map detected, reloading nav file...")
+        LoadNavFile()
+    end
+end
+
 callbacks.Unregister("Draw", "LNX.Lmaobot.Draw")
+callbacks.Unregister("FireGameEvent", "LNX.Lmaobot.FireGameEvent")
+
 callbacks.Register("Draw", "LNX.Lmaobot.Draw", OnDraw)
+callbacks.Register("FireGameEvent", "LNX.Lmaobot.FireGameEvent", OnGameEvent)
+
+--[[ Commands ]]
 
 -- Reloads the nav file
 Commands.Register("pf_reload", function()
@@ -204,40 +220,21 @@ Commands.Register("pf_bench", function (args)
 
     local start = tonumber(args:popFront())
     local goal = tonumber(args:popFront())
-    local iterations = tonumber(args:popFront())
+    local n = tonumber(args:popFront())
 
-    if not start or not goal or not iterations then
+    if not start or not goal or not n then
         print("Start/Goal/Iterations must be numbers!")
         return
     end
 
-    local startNode = navNodes[start]
-    if not startNode then
-        Log:Error("Start node %d not found!", start)
-        return
-    end
-
-    local goalNode = navNodes[goal]
-    if not goalNode then
-        Log:Error("Goal node %d not found!", goal)
-        return
-    end
-
-    local startTime = os.clock()
-    for i = 1, iterations do
-        local path = aStar.Path(startNode, goalNode, navNodes)
-        if not path then
-            Log:Error("Failed to find path from %d to %d!", start, goal)
-            return
-        end
-    end
-    local endTime = os.clock()
-    local elapsedTime = endTime - startTime
-
-    print(string.format("Took %.2f s to find %d paths", elapsedTime, iterations))
+    local time = bench.Run(n, function()
+        FindPath(start, goal)
+    end)
+    Log:Debug("Pathfinding took %.2f s for %d iterations", time, n)
 
     currentPath = nil
     collectgarbage()
 end)
 
+Notify.Alert("Lmaobot loaded!")
 LoadNavFile()

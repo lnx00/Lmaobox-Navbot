@@ -7,11 +7,11 @@
 local Heap = {}
 Heap.__index = Heap
 
-local function findLowest( a, b )
+local function findLowest(a, b)
     return a < b
 end
 
-function Heap.new( template, compare )
+function Heap.new(template, compare)
     local self = setmetatable({}, Heap)
     self.Data = {}
     self.Compare = compare or findLowest
@@ -20,17 +20,17 @@ function Heap.new( template, compare )
     return self
 end
 
-local function sortUp( heap, index )
+local function sortUp(heap, index)
     if index <= 1 then return end
-    local pIndex = index % 2 == 0 and index / 2 or ( index - 1 ) / 2
+    local pIndex = index % 2 == 0 and index / 2 or (index - 1) / 2
 
-    if not heap.Compare( heap.Data[pIndex], heap.Data[index] ) then
+    if not heap.Compare(heap.Data[pIndex], heap.Data[index]) then
         heap.Data[pIndex], heap.Data[index] = heap.Data[index], heap.Data[pIndex]
-        sortUp( heap, pIndex )
+        sortUp(heap, pIndex)
     end
 end
 
-local function sortDown( heap, index )
+local function sortDown(heap, index)
     local leftIndex, rightIndex, minIndex
     leftIndex = index * 2
     rightIndex = leftIndex + 1
@@ -38,13 +38,13 @@ local function sortDown( heap, index )
         if leftIndex > heap.Size then return
         else minIndex = leftIndex end
     else
-        if heap.Compare( heap.Data[leftIndex], heap.Data[rightIndex] ) then minIndex = leftIndex
+        if heap.Compare(heap.Data[leftIndex], heap.Data[rightIndex]) then minIndex = leftIndex
         else minIndex = rightIndex end
     end
 
-    if not heap.Compare( heap.Data[index], heap.Data[minIndex] ) then
+    if not heap.Compare(heap.Data[index], heap.Data[minIndex]) then
         heap.Data[index], heap.Data[minIndex] = heap.Data[minIndex], heap.Data[index]
-        sortDown( heap, minIndex )
+        sortDown(heap, minIndex)
     end
 end
 
@@ -57,11 +57,11 @@ function Heap:Clear()
     return self
 end
 
-function Heap:Push( item )
+function Heap:Push(item)
     if item then
         self.Size = self.Size + 1
         self.Data[self.Size] = item
-        sortUp( self, self.Size )
+        sortUp(self, self.Size)
     end
     return self
 end
@@ -74,10 +74,10 @@ function Heap:Pop()
         self.Data[self.Size] = nil
         self.Size = self.Size - 1
         if self.Size > 1 then
-            sortDown( self, 1 )
+            sortDown(self, 1)
         end
     end
     return root
 end
 
-return setmetatable( Heap, Heap)
+return setmetatable(Heap, Heap)
