@@ -143,7 +143,7 @@ local function OnCreateMove(userCmd)
             currentNodeIndex = currentNodeIndex - 1
             if currentNodeIndex < 1 then
                 Navigation.ClearPath()
-                options.autoPath = false
+                --options.autoPath = false
                 Log:Info("Reached end of path")
             end
         else
@@ -157,8 +157,9 @@ local function OnCreateMove(userCmd)
         end
 
         -- Repath if stuck
-        if currentNodeTicks > 200 then
-            Log:Warn("Stuck on node %d, repathing...", currentNodeIndex)
+        if currentNodeTicks > 250 then
+            Log:Warn("Stuck on node %d, removing connection and repathing...", currentNodeIndex)
+            Navigation.RemoveConnection(currentNode, currentPath[currentNodeIndex - 1])
             Navigation.ClearPath()
             currentNodeTicks = 0
         end
@@ -170,19 +171,23 @@ local function OnCreateMove(userCmd)
 
         -- Get goal (Enemy flag)
         local goalNode = nil
+        local myItem = me:GetPropInt("m_hItem")
         local flags = entities.FindByClass("CCaptureFlag")
         for idx, entity in pairs(flags) do
-            if entity:GetTeamNumber() ~= me:GetTeamNumber() then
+            local myTeam = entity:GetTeamNumber() == me:GetTeamNumber()
+            if (myItem > 0 and myTeam) or (myItem < 0 and not myTeam) then
                 goalNode = Navigation.GetClosestNode(entity:GetAbsOrigin())
                 break
             end
         end
 
+        -- Check if we found a start and goal node
         if not startNode or not goalNode then
             Log:Warn("Could not find new start or goal node")
             return
         end
 
+        -- Update the pathfinder
         Log:Info("Generating new path from node %d to node %d", startNode.id, goalNode.id)
         Navigation.FindPath(startNode, goalNode)
         currentNodeIndex = #Navigation.GetCurrentPath()

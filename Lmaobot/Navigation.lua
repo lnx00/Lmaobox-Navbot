@@ -47,6 +47,21 @@ function Navigation.GetNodeByID(id)
     return Nodes[id]
 end
 
+-- Removes the connection between two nodes (if it exists)
+function Navigation.RemoveConnection(nodeA, nodeB)
+    for dir = 1, 4 do
+		local conDir = nodeA.c[dir]
+        for i, con in pairs(conDir.connections) do
+            if con == nodeB.id then
+                print("Removing connection between " .. nodeA.id .. " and " .. nodeB.id)
+                table.remove(conDir.connections, i)
+                conDir.count = conDir.count - 1
+                break
+            end
+        end
+	end
+end
+
 ---@param navFile string
 function Navigation.LoadFile(navFile)
     -- Read nav file
@@ -88,6 +103,8 @@ function Navigation.GetClosestNode(pos)
 end
 
 -- Returns all adjacent nodes of the given node
+---@param node Node
+---@param nodes Node[]
 local function GetAdjacentNodes(node, nodes)
 	local adjacentNodes = {}
 
@@ -95,7 +112,7 @@ local function GetAdjacentNodes(node, nodes)
 		local conDir = node.c[dir]
         for _, con in pairs(conDir.connections) do
             local conNode = nodes[con]
-            if conNode then
+            if conNode and node.z + 70 > conNode.z then
                 table.insert(adjacentNodes, conNode)
             end
         end
