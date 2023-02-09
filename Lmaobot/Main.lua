@@ -17,16 +17,27 @@ Log.Level = 0
 --[[ Variables ]]
 
 local options = {
-    memoryUsage = true,
-    drawNodes = false,
-    drawPath = false,
-    drawCurrentNode = true,
-    autoPath = true,
+    memoryUsage = true, -- Shows memory usage in the top left corner
+    drawNodes = false, -- Draws all nodes on the map
+    drawPath = true, -- Draws the path to the current goal
+    drawCurrentNode = true, -- Draws the current node
+    autoPath = false, -- Automatically walks to the goal
 }
 
-local repathTimer = Timer.new()
 local currentNodeIndex = 1
 local currentNodeTicks = 0
+
+---@type Vector3[]
+local healthPacks = {}
+
+local Tasks = table.readOnly {
+    None = 0,
+    Objective = 1,
+    Health = 2,
+}
+
+local currentTask = Tasks.Objective
+local taskTimer = Timer.new()
 
 --[[ Functions ]]
 
@@ -129,11 +140,33 @@ local function OnCreateMove(userCmd)
         return
     end
 
+    -- Update the current task
+    if taskTimer:Run(3) then
+        if me:GetHealth() < 100 then
+            if currentTask ~= Tasks.Health then
+                Log:Info("Switching to health task")
+                Navigation.ClearPath()
+            end
+    
+            currentTask = Tasks.Health
+        else
+            if currentTask ~= Tasks.Objective then
+                Log:Info("Switching to objective task")
+                Navigation.ClearPath()
+            end
+    
+            currentTask = Tasks.Objective
+        end
+    end
+
     local myPos = me:GetAbsOrigin()
     local currentPath = Navigation.GetCurrentPath()
 
+    if currentTask == Tasks.None then return end
+
     if currentPath then
         -- Move along path
+
         local currentNode = currentPath[currentNodeIndex]
         local currentNodePos = Vector3(currentNode.x, currentNode.y, currentNode.z)
 
@@ -145,6 +178,7 @@ local function OnCreateMove(userCmd)
                 Navigation.ClearPath()
                 --options.autoPath = false
                 Log:Info("Reached end of path")
+                currentTask = Tasks.None
             end
         else
             currentNodeTicks = currentNodeTicks + 1
@@ -168,17 +202,39 @@ local function OnCreateMove(userCmd)
 
         -- Get start (Local player position)
         local startNode = Navigation.GetClosestNode(myPos)
-
-        -- Get goal (Enemy flag)
         local goalNode = nil
-        local myItem = me:GetPropInt("m_hItem")
-        local flags = entities.FindByClass("CCaptureFlag")
-        for idx, entity in pairs(flags) do
-            local myTeam = entity:GetTeamNumber() == me:GetTeamNumber()
-            if (myItem > 0 and myTeam) or (myItem < 0 and not myTeam) then
-                goalNode = Navigation.GetClosestNode(entity:GetAbsOrigin())
-                break
+
+        -- Get goal for the current task
+        if currentTask == Tasks.Objective then
+            
+            -- Find the current flag (enemy or team)
+            local myItem = me:GetPropInt("m_hItem")
+            local flags = entities.FindByClass("CCaptureFlag")
+            for idx, entity in pairs(flags) do
+                local myTeam = entity:GetTeamNumber() == me:GetTeamNumber()
+                if (myItem > 0 and myTeam) or (myItem < 0 and not myTeam) then
+                    goalNode = Navigation.GetClosestNode(entity:GetAbsOrigin())
+                    Log:Info("Found flag at node %d", goalNode.id)
+                    break
+                end
             end
+
+        elseif currentTask == Tasks.Health then
+
+            -- Find the closest health pack
+            local closestDist = math.huge
+            for idx, pos in pairs(healthPacks) do
+                local dist = (myPos - pos):Length()
+                if dist < closestDist then
+                    closestDist = dist
+                    goalNode = Navigation.GetClosestNode(pos)
+                    Log:Info("Found health pack at node %d", goalNode.id)
+                end
+            end
+
+        else
+            Log:Debug("Unknown task: %d", currentTask)
+            return
         end
 
         -- Check if we found a start and goal node
@@ -194,6 +250,15 @@ local function OnCreateMove(userCmd)
     end
 end
 
+---@param ctx DrawModelContext
+local function OnDrawModel(ctx)
+    -- TODO: This find a better way to do this
+    if ctx:GetModelName():find("medkit") then
+        local entity = ctx:GetEntity()
+        healthPacks[entity:GetIndex()] = entity:GetAbsOrigin()
+    end
+end
+
 ---@param event GameEvent
 local function OnGameEvent(event)
     local eventName = event:GetName()
@@ -201,16 +266,20 @@ local function OnGameEvent(event)
     -- Reload nav file on new map
     if eventName == "game_newmap" then
         Log:Info("New map detected, reloading nav file...")
+
+        healthPacks = {}
         LoadNavFile()
     end
 end
 
 callbacks.Unregister("Draw", "LNX.Lmaobot.Draw")
 callbacks.Unregister("CreateMove", "LNX.Lmaobot.CreateMove")
+callbacks.Unregister("DrawModel", "LNX.Lmaobot.DrawModel")
 callbacks.Unregister("FireGameEvent", "LNX.Lmaobot.FireGameEvent")
 
 callbacks.Register("Draw", "LNX.Lmaobot.Draw", OnDraw)
 callbacks.Register("CreateMove", "LNX.Lmaobot.CreateMove", OnCreateMove)
+callbacks.Register("DrawModel", "LNX.Lmaobot.DrawModel", OnDrawModel)
 callbacks.Register("FireGameEvent", "LNX.Lmaobot.FireGameEvent", OnGameEvent)
 
 --[[ Commands ]]
